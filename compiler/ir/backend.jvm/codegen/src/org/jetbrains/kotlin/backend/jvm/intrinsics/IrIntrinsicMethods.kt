@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.ir.util.isFileClass
 import org.jetbrains.kotlin.lexer.KtSingleValueToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
 import org.jetbrains.org.objectweb.asm.Opcodes.*
@@ -115,6 +116,9 @@ class IrIntrinsicMethods(val irBuiltIns: IrBuiltIns, val symbols: JvmSymbols) {
                     symbols.primitiveIteratorsByType.values.map { iteratorClass ->
                         createKeyMapping(IteratorNext, iteratorClass, "next")
                     } +
+                    // Java 8 PrimitiveIterator.OfInt/OfLong/OfDouble, and (Mutable)Iterator.next when
+                    // the receiver is statically typed as one of those (see IteratorNext).
+                    javaPrimitiveIteratorNextKeys() +
                     arrayMethods() +
                     primitiveComparisonIntrinsics(irBuiltIns.lessFunByOperandType, KtTokens.LT) +
                     primitiveComparisonIntrinsics(irBuiltIns.lessOrEqualFunByOperandType, KtTokens.LTEQ) +
@@ -159,6 +163,17 @@ class IrIntrinsicMethods(val irBuiltIns: IrBuiltIns, val symbols: JvmSymbols) {
         val byReceiver = byName[receiverFqName] ?: return null
         val ownerFqName = function.computeOwnerFqName() ?: return null
         return byReceiver[Key(ownerFqName, receiverFqName, name, function.computeValueParameterFqNames())]
+    }
+
+    private fun javaPrimitiveIteratorNextKeys(): List<Pair<Key, IntrinsicMethod>> {
+        val javaOfInt = FqName("java.util.PrimitiveIterator.OfInt")
+        val javaOfLong = FqName("java.util.PrimitiveIterator.OfLong")
+        val javaOfDouble = FqName("java.util.PrimitiveIterator.OfDouble")
+        val kotlinIterator = StandardNames.COLLECTIONS_PACKAGE_FQ_NAME.child(Name.identifier("Iterator"))
+        val kotlinMutableIterator = StandardNames.COLLECTIONS_PACKAGE_FQ_NAME.child(Name.identifier("MutableIterator"))
+        return listOf(javaOfInt, javaOfLong, javaOfDouble, kotlinIterator, kotlinMutableIterator).map { owner ->
+            Key(owner, null, "next", emptyList()) to IteratorNext
+        }
     }
 
     private fun unaryFunForPrimitives(name: String, intrinsic: IntrinsicMethod): List<Pair<Key, IntrinsicMethod>> =
