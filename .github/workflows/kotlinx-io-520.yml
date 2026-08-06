@@ -1,0 +1,93 @@
+name: kotlinx-io 520 bytecode probe
+
+on:
+  push:
+    branches:
+      - codex/kotlinx-io-520-actions
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 1.6.10
+            version: 1.6.10
+            flags: ""
+          - name: 1.6.20
+            version: 1.6.20
+            flags: ""
+          - name: 1.6.21
+            version: 1.6.21
+            flags: ""
+          - name: 1.6.21-old
+            version: 1.6.21
+            flags: -Xuse-old-backend
+          - name: 2.4.10
+            version: 2.4.10
+            flags: ""
+
+    name: Kotlin ${{ matrix.name }}
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Compile and inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o compiler.zip \
+            "https://github.com/JetBrains/kotlin/releases/download/v${{ matrix.version }}/kotlin-compiler-${{ matrix.version }}.zip"
+          unzip -q compiler.zip
+
+          cat > Repro.kt <<'KOTLIN'
+          private inline fun scan(n: Int, charAt: (Int) -> Char): Int {
+              var acc = 0
+              var i = 0
+              while (i < n) {
+                  var c = charAt(i).code
+                  acc += run { c = charAt(i).code; c }
+                  i++
+              }
+              return acc
+          }
+
+          fun good(s: String): Int = scan(s.length, s::get)
+          fun bad(s: String): Int = run { scan(s.length, s::get) }
+          KOTLIN
+
+          kotlinc/bin/kotlinc Repro.kt ${{ matrix.flags }} -d repro.jar
+          javap -classpath repro.jar -c -v -l -p ReproKt > ReproKt.javap
+
+          awk '
+            /^  (public|private|protected).*[)][;]$/ { section = "" }
+            /^  public static final int good[(]java.lang.String[)][;]$/ { section = "good" }
+            /^  public static final int bad[(]java.lang.String[)][;]$/ { section = "bad" }
+            section == "good" { print > "good.javap" }
+            section == "bad" { print > "bad.javap" }
+          ' ReproKt.javap
+
+          printf '%-6s box unbox intref\n' method | tee report.txt
+          for method in good bad; do
+            box=$(grep -c 'Character.valueOf' "$method.javap" || true)
+            unbox=$(grep -c 'Character.charValue' "$method.javap" || true)
+            intref=$(grep -c 'new.*Ref\$IntRef' "$method.javap" || true)
+            printf '%-6s %s   %s     %s\n' "$method" "$box" "$unbox" "$intref" | tee -a report.txt
+          done
+          cat report.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bytecode-${{ matrix.name }}
+          path: |
+            ReproKt.javap
+            good.javap
+            bad.javap
+            report.txt
