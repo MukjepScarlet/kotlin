@@ -12,5 +12,5 @@ private inline fun scan(n: Int, charAt: (Int) -> Char): Int {
 fun test(s: String): Int = run { scan(s.length, s::get) }
 
 // 0 NEW kotlin/jvm/internal/Ref\$IntRef
-// 1 java/lang/Character\.valueOf
-// 3 java/lang/Character\.charValue
+// 0 java/lang/Character\.valueOf
+// 2 java/lang/Character\.charValue
