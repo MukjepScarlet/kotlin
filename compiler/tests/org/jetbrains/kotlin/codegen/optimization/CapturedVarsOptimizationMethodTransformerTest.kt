@@ -11,13 +11,14 @@ import org.jetbrains.org.objectweb.asm.tree.TypeInsnNode
 import org.jetbrains.org.objectweb.asm.tree.analysis.Analyzer
 import org.jetbrains.org.objectweb.asm.tree.analysis.BasicVerifier
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CapturedVarsOptimizationMethodTransformerTest {
     @Test
     fun testSwapWithWideCapturedVars() {
-        transformAndVerify(wideRefMethod("kotlin/jvm/internal/Ref\$LongRef", "J", Opcodes.LCONST_0))
-        transformAndVerify(wideRefMethod("kotlin/jvm/internal/Ref\$DoubleRef", "D", Opcodes.DCONST_0))
+        transformAndVerify(wideRefMethod("kotlin/jvm/internal/Ref\$LongRef", "J", Opcodes.LCONST_0), optimized = false)
+        transformAndVerify(wideRefMethod("kotlin/jvm/internal/Ref\$DoubleRef", "D", Opcodes.DCONST_0), optimized = false)
     }
 
     @Test
@@ -44,7 +45,7 @@ class CapturedVarsOptimizationMethodTransformerTest {
             visitEnd()
         }
 
-        transformAndVerify(method)
+        transformAndVerify(method, optimized = false)
     }
 
     private fun wideRefMethod(refType: String, elementType: String, valueOpcode: Int): MethodNode =
@@ -77,11 +78,18 @@ class CapturedVarsOptimizationMethodTransformerTest {
         visitVarInsn(Opcodes.ASTORE, local)
     }
 
-    private fun transformAndVerify(method: MethodNode) {
+    private fun transformAndVerify(method: MethodNode, optimized: Boolean) {
         CapturedVarsOptimizationMethodTransformer().transform("Test", method)
         Analyzer(BasicVerifier()).analyze("Test", method)
 
-        assertFalse(method.instructions.toArray().any { it.opcode == Opcodes.SWAP })
-        assertFalse(method.instructions.toArray().filterIsInstance<TypeInsnNode>().any { it.opcode == Opcodes.NEW })
+        val hasSwap = method.instructions.toArray().any { it.opcode == Opcodes.SWAP }
+        val hasRefAllocation = method.instructions.toArray().filterIsInstance<TypeInsnNode>().any { it.opcode == Opcodes.NEW }
+        if (optimized) {
+            assertFalse(hasSwap)
+            assertFalse(hasRefAllocation)
+        } else {
+            assertTrue(hasSwap)
+            assertTrue(hasRefAllocation)
+        }
     }
 }
