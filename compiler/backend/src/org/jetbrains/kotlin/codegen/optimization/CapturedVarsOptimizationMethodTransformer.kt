@@ -137,7 +137,7 @@ class CapturedVarsOptimizationMethodTransformer : MethodTransformer() {
         }
 
         private fun validateSwapUsages() {
-            for ((swap, descriptors) in swapDescriptors) {
+            for ([swap, descriptors] in swapDescriptors) {
                 if (descriptors.size == 1 && descriptors.single().valueType.size == 1) {
                     descriptors.single().wrapperInsns.add(swap)
                 } else {
