@@ -27,7 +27,9 @@ jobs:
           cache-read-only: false
       - run: >-
           ./gradlew :compiler:fir:fir2ir:generateTests :compiler:fir:fir2ir:test
-          --tests '*CallableReferenceWithSwap*' -q
+          --tests '*CallableReferenceWithSwap*'
+          --tests '*CapturedVarsOfSize2*'
+          --tests '*SharedSlotsWithCapturedVars*' -q
       - if: always()
         uses: actions/upload-artifact@v4
         with:
