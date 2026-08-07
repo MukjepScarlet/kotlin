@@ -30,6 +30,9 @@ jobs:
           --tests '*CallableReferenceWithSwap*'
           --tests '*CapturedVarsOfSize2*'
           --tests '*SharedSlotsWithCapturedVars*' -q
+      - run: >-
+          ./gradlew :compiler:test
+          --tests '*CapturedVarsOptimizationMethodTransformerTest*' -q
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -38,3 +41,5 @@ jobs:
           path: |
             compiler/fir/fir2ir/build/test-results/test/**
             compiler/fir/fir2ir/build/reports/tests/test/**
+            compiler/build/test-results/test/**
+            compiler/build/reports/tests/test/**
