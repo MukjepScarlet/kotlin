@@ -1,0 +1,28 @@
+name: KT-88352 JVM IR regression
+
+on:
+  push:
+    branches:
+      - codex/kotlinx-io-520-actions
+    paths:
+      - compiler/backend/src/org/jetbrains/kotlin/codegen/optimization/CapturedVarsOptimizationMethodTransformer.kt
+      - compiler/testData/codegen/bytecodeText/capturedVarsOptimization/callableReferenceWithSwap.kt
+      - .github/workflows/kt-88352.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: >-
+          ./gradlew generateTests :compiler:fir:fir2ir:test
+          --tests '*CallableReferenceWithSwap*' -q

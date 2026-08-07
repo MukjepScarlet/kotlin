@@ -29,7 +29,7 @@ class CapturedVarsOptimizationMethodTransformer : MethodTransformer() {
     //
     // The 'kotlin.jvm.internal.Ref.*' instance can be replaced with a local variable, if
     //  * it is created inside a current method;
-    //  * the only operations on it are ALOAD, ASTORE, DUP, POP, GETFIELD element, PUTFIELD element.
+    //  * the only operations on it are ALOAD, ASTORE, DUP, SWAP, POP, GETFIELD element, PUTFIELD element.
     //
     // Note that for code that doesn't create Ref objects explicitly these conditions are true,
     // unless the Ref object escapes to a local class constructor (including local classes for lambdas).
@@ -100,6 +100,7 @@ class CapturedVarsOptimizationMethodTransformer : MethodTransformer() {
                         insn.opcode == Opcodes.DUP -> descriptor.wrapperInsns.add(insn)
                         insn.opcode == Opcodes.ALOAD -> descriptor.wrapperInsns.add(insn)
                         insn.opcode == Opcodes.ASTORE -> descriptor.wrapperInsns.add(insn)
+                        insn.opcode == Opcodes.SWAP -> descriptor.wrapperInsns.add(insn)
                         insn.opcode == Opcodes.GETFIELD && insn is FieldInsnNode && insn.name == REF_ELEMENT_FIELD && position == 0 ->
                             descriptor.getFieldInsns.add(insn)
                         insn.opcode == Opcodes.PUTFIELD && insn is FieldInsnNode && insn.name == REF_ELEMENT_FIELD && position == 0 ->
