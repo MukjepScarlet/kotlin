@@ -23,6 +23,16 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - run: >-
-          ./gradlew generateTests :compiler:fir:fir2ir:test
+          ./gradlew :compiler:fir:fir2ir:generateTests :compiler:fir:fir2ir:test
           --tests '*CallableReferenceWithSwap*' -q
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kt-88352-test-report
+          if-no-files-found: warn
+          path: |
+            compiler/fir/fir2ir/build/test-results/test/**
+            compiler/fir/fir2ir/build/reports/tests/test/**
