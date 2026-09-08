@@ -1,0 +1,38 @@
+name: KT-89223 reproduction
+
+on:
+  push:
+    branches:
+      - KT-89223-repro
+    paths:
+      - compiler/ir/backend.jvm/lower/src/org/jetbrains/kotlin/backend/jvm/lower/IndyLambdaMetafactoryLowering.kt
+      - compiler/testData/codegen/boxJvm/invokedynamic/sam/**
+      - .github/workflows/kt-89223-repro.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+      - run: >-
+          ./gradlew :compiler:tests-common-new:generateTests :compiler:tests-common-new:test
+          --tests '*Invokedynamic*Sam*' -q
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kt-89223-test-report
+          if-no-files-found: warn
+          path: |
+            compiler/tests-common-new/build/test-results/test/**
+            compiler/tests-common-new/build/reports/tests/test/**
