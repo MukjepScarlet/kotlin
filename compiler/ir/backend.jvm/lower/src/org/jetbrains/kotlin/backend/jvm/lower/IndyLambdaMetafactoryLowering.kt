@@ -370,17 +370,22 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
     }
 
     private fun IrRichFunctionReference.directImplementationFunction(): IrSimpleFunction? {
-        val target = reflectionTargetSymbol?.owner as? IrSimpleFunction ?: return null
+        if (reflectionTargetSymbol == null) return null
         val body = invokeFunction.body as? IrBlockBody ?: return null
-        val returnedCall = (body.statements.lastOrNull() as? IrReturn)?.value as? IrCall ?: return null
+        val returnedCall = ((body.statements.lastOrNull() as? IrReturn)?.value as? IrTypeOperatorCall)?.argument
+            ?.let { it as? IrCall }
+            ?: ((body.statements.lastOrNull() as? IrReturn)?.value as? IrCall)
+            ?: return null
         if (body.statements.dropLast(1).any { statement ->
                 val check = (statement as? IrCall)?.symbol?.owner ?: return@any true
-                check.parentAsClass.fqNameWhenAvailable?.asString() != "kotlin.jvm.internal.Intrinsics" ||
-                    check.name.asString() != "checkNotNullParameter"
+                check.fqNameWhenAvailable?.asString() != "kotlin.jvm.internal.Intrinsics.checkNotNullParameter"
             }) {
             return null
         }
-        if (returnedCall.symbol != target.symbol || returnedCall.arguments.size != target.parameters.size) return null
+        val target = returnedCall.symbol.owner.resolveFakeOverrideOrSelf() as? IrSimpleFunction ?: return null
+        // A direct handle cannot bypass JVM visibility/accessor generation or inline-only semantics.
+        if (target.parent !is IrClass || DescriptorVisibilities.isPrivate(target.visibility) || target.isInlineOnly()) return null
+        if (returnedCall.arguments.size != target.parameters.size) return null
         val forwardedArguments = buildList<IrExpression?> {
             returnedCall.dispatchReceiver?.let(::add)
             addAll(returnedCall.arguments)
