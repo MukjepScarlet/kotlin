@@ -407,7 +407,7 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
             } ?: return null
         }
         if (forwardedArguments.zip(target.parameters).any { (argument, parameter) ->
-                argument.type != parameter.type
+                argument?.type != parameter.type
             }) {
             return null
         }
