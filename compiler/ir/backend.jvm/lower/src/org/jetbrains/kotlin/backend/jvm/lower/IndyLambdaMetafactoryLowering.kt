@@ -387,7 +387,11 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
             returnedCall.dispatchReceiver?.let(::add)
             addAll(returnedCall.arguments)
         }
-        if (forwardedArguments.size != target.parameters.size) return null
+        val targetParameters = buildList {
+            target.dispatchReceiverParameter?.let(::add)
+            addAll(target.nonDispatchParameters)
+        }
+        if (forwardedArguments.size != targetParameters.size) return null
         val forwardedParameters = forwardedArguments.map {
             when (it) {
                 is IrGetValue -> it.symbol
