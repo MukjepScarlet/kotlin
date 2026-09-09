@@ -382,7 +382,15 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
         val returnedCall = unwrappedValue as? IrCall ?: return null
         val target = returnedCall.symbol.owner.resolveFakeOverrideOrSelf() as? IrSimpleFunction ?: return null
         // A direct handle cannot bypass JVM visibility/accessor generation or inline-only semantics.
-        if (target.parent !is IrClass || DescriptorVisibilities.isPrivate(target.visibility) || target.isInlineOnly()) return null
+        if (
+            target.parent !is IrClass ||
+            DescriptorVisibilities.isPrivate(target.visibility) ||
+            target.isInlineOnly() ||
+            target.typeParameters.any { it.isReified } ||
+            backendContext.getIntrinsic(target.symbol) != null
+        ) {
+            return null
+        }
         // `dispatchReceiver` is a view of `arguments[0]`, not an additional slot.
         // The arguments list already follows the target function's complete parameter list.
         if (returnedCall.arguments.size != target.parameters.size) return null
