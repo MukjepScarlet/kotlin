@@ -370,18 +370,16 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
     }
 
     private fun IrRichFunctionReference.directImplementationFunction(): IrSimpleFunction? {
-        if (reflectionTargetSymbol == null) return null
         val body = invokeFunction.body as? IrBlockBody ?: return null
-        val returnedCall = ((body.statements.lastOrNull() as? IrReturn)?.value as? IrTypeOperatorCall)?.argument
-            ?.let { it as? IrCall }
-            ?: ((body.statements.lastOrNull() as? IrReturn)?.value as? IrCall)
-            ?: return null
-        if (body.statements.dropLast(1).any { statement ->
-                val check = (statement as? IrCall)?.symbol?.owner ?: return@any true
-                check.fqNameWhenAvailable?.asString() != "kotlin.jvm.internal.Intrinsics.checkNotNullParameter"
-            }) {
-            return null
-        }
+        val lastStatement = body.statements.lastOrNull() ?: return null
+        val returnedValue = when (lastStatement) {
+            is IrReturn -> lastStatement.value
+            is IrCall -> lastStatement
+            else -> null
+        } ?: return null
+        var unwrappedValue = returnedValue
+        while (unwrappedValue is IrTypeOperatorCall) unwrappedValue = unwrappedValue.argument
+        val returnedCall = unwrappedValue as? IrCall ?: return null
         val target = returnedCall.symbol.owner.resolveFakeOverrideOrSelf() as? IrSimpleFunction ?: return null
         // A direct handle cannot bypass JVM visibility/accessor generation or inline-only semantics.
         if (target.parent !is IrClass || DescriptorVisibilities.isPrivate(target.visibility) || target.isInlineOnly()) return null
