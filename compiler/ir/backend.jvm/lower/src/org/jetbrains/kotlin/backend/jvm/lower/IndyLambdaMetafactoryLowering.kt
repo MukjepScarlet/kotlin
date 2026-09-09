@@ -387,6 +387,7 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
             DescriptorVisibilities.isPrivate(target.visibility) ||
             target.isInlineOnly() ||
             target.typeParameters.any { it.isReified } ||
+            backendContext.getIntrinsic(returnedCall.symbol) != null ||
             backendContext.getIntrinsic(target.symbol) != null
         ) {
             return null
