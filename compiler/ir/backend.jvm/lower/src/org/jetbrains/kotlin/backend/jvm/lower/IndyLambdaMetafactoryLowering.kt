@@ -381,14 +381,17 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
         while (unwrappedValue is IrTypeOperatorCall) unwrappedValue = unwrappedValue.argument
         val returnedCall = unwrappedValue as? IrCall ?: return null
         val target = returnedCall.symbol.owner.resolveFakeOverrideOrSelf() as? IrSimpleFunction ?: return null
-        // A direct handle cannot bypass JVM visibility/accessor generation or inline-only semantics.
+        val targetClass = target.parent as? IrClass ?: return null
+        // A direct handle cannot bypass accessors, inlining, intrinsics, super dispatch, or wrapper adaptations.
         if (
-            target.parent !is IrClass ||
-            DescriptorVisibilities.isPrivate(target.visibility) ||
+            target.visibility != DescriptorVisibilities.PUBLIC ||
+            targetClass.visibility != DescriptorVisibilities.PUBLIC ||
             target.isInlineOnly() ||
             target.typeParameters.any { it.isReified } ||
             backendContext.getIntrinsic(returnedCall.symbol) != null ||
-            backendContext.getIntrinsic(target.symbol) != null
+            backendContext.getIntrinsic(target.symbol) != null ||
+            returnedCall.superQualifierSymbol != null ||
+            target.returnType.isUnit() && !invokeFunction.returnType.isUnit()
         ) {
             return null
         }
