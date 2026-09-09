@@ -383,15 +383,10 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
         val target = returnedCall.symbol.owner.resolveFakeOverrideOrSelf() as? IrSimpleFunction ?: return null
         // A direct handle cannot bypass JVM visibility/accessor generation or inline-only semantics.
         if (target.parent !is IrClass || DescriptorVisibilities.isPrivate(target.visibility) || target.isInlineOnly()) return null
-        val forwardedArguments = buildList<IrExpression?> {
-            returnedCall.dispatchReceiver?.let(::add)
-            addAll(returnedCall.arguments)
-        }
-        val targetParameters = buildList {
-            target.dispatchReceiverParameter?.let(::add)
-            addAll(target.nonDispatchParameters)
-        }
-        if (forwardedArguments.size != targetParameters.size) return null
+        // `dispatchReceiver` is a view of `arguments[0]`, not an additional slot.
+        // The arguments list already follows the target function's complete parameter list.
+        if (returnedCall.arguments.size != target.parameters.size) return null
+        val forwardedArguments = returnedCall.arguments
         val forwardedParameters = forwardedArguments.map {
             when (it) {
                 is IrGetValue -> it.symbol
