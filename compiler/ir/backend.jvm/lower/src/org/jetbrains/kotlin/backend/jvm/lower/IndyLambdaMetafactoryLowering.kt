@@ -403,9 +403,13 @@ class IndyLambdaMetafactoryLowering(val backendContext: JvmBackendContext) : Fil
         val forwardedParameters = forwardedArguments.map {
             when (it) {
                 is IrGetValue -> it.symbol
-                is IrTypeOperatorCall -> (it.argument as? IrGetValue)?.symbol
                 else -> null
             } ?: return null
+        }
+        if (forwardedArguments.zip(target.parameters).any { (argument, parameter) ->
+                argument.type != parameter.type
+            }) {
+            return null
         }
         if (forwardedParameters.size != invokeFunction.parameters.size ||
             forwardedParameters.toSet() != invokeFunction.parameters.map { it.symbol }.toSet()
