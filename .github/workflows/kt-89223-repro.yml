@@ -24,6 +24,7 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
         with:
+          # Keep the shared Gradle cache enabled for iterative workflow runs.
           cache-read-only: false
       - run: >-
           ./gradlew :compiler:tests-common-new:generateTests :compiler:tests-common-new:test
