@@ -1,0 +1,16 @@
+name: KT-23168 validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/kt-23168-stateless-lambda]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :compiler:fir:fir2ir:test --tests '*BlackBoxInlineCodegenTestGenerated.testCrossinlineLambda1' --info
