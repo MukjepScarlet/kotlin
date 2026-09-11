@@ -69,3 +69,18 @@ jobs:
           --tests "org.jetbrains.kotlin.test.runners.codegen.FirLightTreeBytecodeTextTestGenerated*"
           -Pkotlin.test.xmx=2g
           --stacktrace
+
+      - name: Print assertion failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          for path in sorted(glob.glob('compiler/fir/fir2ir/build/test-results/test/*.xml')):
+              for case in ET.parse(path).getroot().iter('testcase'):
+                  for failure in case.findall('failure'):
+                      print('=' * 20, case.get('classname'), case.get('name'))
+                      print(failure.get('message'))
+                      print(failure.text)
+          PY
