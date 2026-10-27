@@ -31,8 +31,7 @@ class TemporaryVariablesEliminationTransformer : MethodTransformer() {
         val cfg = ControlFlowGraph(methodNode)
         processLabels(cfg)
 
-        // TEMPORARY DIAGNOSTIC: disabled to locate the DUP/POP source
-        if (false) simplifyKnownSafeCallPatterns(cfg)
+        simplifyKnownSafeCallPatterns(cfg)
 
         val temporaryVals = temporaryValsAnalyzer.analyze(internalClassName, methodNode)
         if (temporaryVals.isNotEmpty()) {
