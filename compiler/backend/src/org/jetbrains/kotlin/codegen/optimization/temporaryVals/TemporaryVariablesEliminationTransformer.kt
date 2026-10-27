@@ -350,10 +350,6 @@ class TemporaryVariablesEliminationTransformer : MethodTransformer() {
                 val ifNonNull = insn.next as JumpInsnNode
                 val label1 = ifNonNull.label
                 if (!cfg.hasSinglePredecessor(ifNonNull.label, ifNonNull)) continue
-                // Hoisting the load only pays off when the false branch joins the value at `label1` (plain `x ?: y`).
-                // If that branch diverges (`x ?: return`, `x ?: throw`), the load is not removed but replaced with
-                // DUP+POP, and the value is kept alive on the operand stack across the diverging branch.
-                if (ifNonNull.next.isDivergingBefore(label1)) continue
 
                 val label1Next = label1.next ?: continue
                 if (label1Next.opcode == Opcodes.ALOAD) {
@@ -461,6 +457,10 @@ class TemporaryVariablesEliminationTransformer : MethodTransformer() {
 
                 val ifNull1 = insn.next as JumpInsnNode
                 val ifNullLabel = ifNull1.label
+                // Keep the hoist only when the null path falls through to the chain. If it ends in
+                // `return`/`throw` (`x ?: return`, `x ?: throw`), nothing after the label reads the
+                // hoisted value, so the rewrite would only add a DUP/POP pair.
+                if (ifNullLabel.endsWithReturnOrThrow()) continue
                 val predecessors = cfg.getAllPredecessors(ifNullLabel)
                 if (predecessors.all { isRewritableSafeCallPart(it) }) {
                     predecessors.forEach { rewriteSafeCallPart(it, insnList) }
@@ -474,12 +474,19 @@ class TemporaryVariablesEliminationTransformer : MethodTransformer() {
         cfg.methodNode.maxStack += maxStackIncrement
     }
 
-    private fun AbstractInsnNode.isDivergingBefore(end: LabelNode): Boolean {
-        var insn: AbstractInsnNode? = this
-        while (insn != null && insn !== end) {
+    /**
+     * True if the basic block starting at this label ends in `return` or `throw` instead of falling through
+     * to the merge point. The value that [simplifyKnownSafeCallPatterns] hoists onto the stack is then never
+     * read on the null path, so keeping it alive there (`DUP` + `POP`) only adds an instruction and a stack
+     * slot to the non-null path. For `x ?: y` the null block falls through and the hoist is a win, so it is
+     * left alone. See KT-90253.
+     */
+    private fun AbstractInsnNode.endsWithReturnOrThrow(): Boolean {
+        var insn: AbstractInsnNode? = this.next
+        while (insn != null) {
             when {
-                insn.opcode == Opcodes.GOTO -> return false
                 insn.opcode == Opcodes.ATHROW || insn.opcode in Opcodes.IRETURN..Opcodes.RETURN -> return true
+                insn.nodeType == AbstractInsnNode.JUMP_INSN || insn is LabelNode -> return false
             }
             insn = insn.next
         }
