@@ -1,0 +1,90 @@
+name: KT-90253 validation
+
+on:
+  push:
+    branches:
+      - kt-90253-elvis-dup-pop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: bytecodeText
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      # JDK 21 runs the Gradle daemon, JDK 8 runs the tests,
+      # JDK 11/17 satisfy the toolchain matrix of the build.
+      - name: Set up JDK 8
+        id: jdk8
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Set up JDK 11
+        id: jdk11
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Set up JDK 17
+        id: jdk17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up JDK 21
+        id: jdk21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # Feature branches are read-only by default, which makes every
+          # run cold. Drop this line when validating on the default branch.
+          cache-read-only: false
+
+      - name: Run tests
+        env:
+          JAVA_HOME: ${{ steps.jdk21.outputs.path }}
+          JDK_1_8: ${{ steps.jdk8.outputs.path }}
+          JDK_11_0: ${{ steps.jdk11.outputs.path }}
+          JDK_17_0: ${{ steps.jdk17.outputs.path }}
+          JDK_21_0: ${{ steps.jdk21.outputs.path }}
+        run: >
+          ./gradlew :compiler:fir:fir2ir:test
+          --tests "org.jetbrains.kotlin.test.runners.codegen.FirLightTreeBytecodeTextTestGenerated*"
+          -Pkotlin.test.xmx=2g
+          --stacktrace
+
+      # Gradle prints only failing test names; the assertion messages with
+      # the expected and actual output live in the XML reports, which are
+      # lost with the runner.
+      - name: Print assertion failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          for path in sorted(glob.glob('compiler/fir/fir2ir/build/test-results/test/*.xml')):
+              for case in ET.parse(path).getroot().iter('testcase'):
+                  for failure in case.findall('failure'):
+                      print('=' * 20, case.get('classname'), case.get('name'))
+                      print(failure.get('message'))
+                      print(failure.text)
+          PY
