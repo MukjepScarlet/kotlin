@@ -350,6 +350,10 @@ class TemporaryVariablesEliminationTransformer : MethodTransformer() {
                 val ifNonNull = insn.next as JumpInsnNode
                 val label1 = ifNonNull.label
                 if (!cfg.hasSinglePredecessor(ifNonNull.label, ifNonNull)) continue
+                // Hoisting the load only pays off when the false branch joins the value at `label1` (plain `x ?: y`).
+                // If that branch diverges (`x ?: return`, `x ?: throw`), the load is not removed but replaced with
+                // DUP+POP, and the value is kept alive on the operand stack across the diverging branch.
+                if (ifNonNull.next.isDivergingBefore(label1)) continue
 
                 val label1Next = label1.next ?: continue
                 if (label1Next.opcode == Opcodes.ALOAD) {
@@ -468,6 +472,18 @@ class TemporaryVariablesEliminationTransformer : MethodTransformer() {
         }
 
         cfg.methodNode.maxStack += maxStackIncrement
+    }
+
+    private fun AbstractInsnNode.isDivergingBefore(end: LabelNode): Boolean {
+        var insn: AbstractInsnNode? = this
+        while (insn != null && insn !== end) {
+            when {
+                insn.opcode == Opcodes.GOTO -> return false
+                insn.opcode == Opcodes.ATHROW || insn.opcode in Opcodes.IRETURN..Opcodes.RETURN -> return true
+            }
+            insn = insn.next
+        }
+        return false
     }
 
     private fun isRewritableSafeCallPart(branchInsn: AbstractInsnNode): Boolean {
