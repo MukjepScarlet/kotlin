@@ -7,7 +7,7 @@ fun h(s: String?): Int {
     return b.length
 }
 
-fun plain(s: String?): Int = (s ?: 42).length
+fun plain(s: String?): Int = (s ?: "abc").length
 
 // 1 DUP
 //  ^ only the plain elvis keeps the value on the stack across the null check
